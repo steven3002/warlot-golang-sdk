@@ -7,22 +7,23 @@ Operational issues typically fall into one of four categories: build/setup, tran
 ## Diagnosis workflow
 
 ```mermaid
-%%{init: {'theme': 'base'}}%%
+%%{init: {"theme": "base"}}%%
 flowchart TD
-  A[Observed failure] --> B{Compile-time or runtime?}
-  B -->|Compile-time| C[Build/SDK setup checks]
-  B -->|Runtime| D{HTTP response seen?}
-  D -->|No| E[Transport error: DNS/TLS/timeout]
-  D -->|Yes| F{Status code class}
-  F -->|2xx| G{JSON decode or SQL error?}
-  G -->|Decode| H[Shape/type mismatch]
-  G -->|SQL err| I[Service reported statement failure]
-  F -->|4xx (≠429)| J[Auth/scope/route]
-  F -->|429| K[Rate limit: retry/backoff/idempotency]
-  F -->|5xx| L[Transient: retry/backoff; raise if persistent]
-  E --> M[Proxy/firewall/timeout tuning]
-  J --> N[Headers/keys/scope alignment]
-  H --> O[Typed mapping vs. untyped rows]
+  A[Observed failure] --> B{"Compile-time or runtime?"}
+  B -->|Compile-time| C["Build/SDK setup checks"]
+  B -->|Runtime| D{"HTTP response seen?"}
+  D -->|No| E["Transport error: DNS/TLS/timeout"]
+  D -->|Yes| F{"Status code class"}
+  F -->|2xx| G{"JSON decode or SQL error?"}
+  G -->|Decode| H["Shape/type mismatch"]
+  G -->|SQL error| I["Service reported statement failure"]
+  F -->|4xx except 429| J["Auth/scope/route"]
+  F -->|429| K["Rate limit: retry/backoff/idempotency"]
+  F -->|5xx| L["Transient: retry/backoff; raise if persistent"]
+  E --> M["Proxy/firewall/timeout tuning"]
+  J --> N["Headers/keys/scope alignment"]
+  H --> O["Typed mapping vs untyped rows"]
+
 ```
 
 ---

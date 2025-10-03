@@ -1,5 +1,5 @@
 ```mermaid
-%%{init: {'theme': 'base'}}%%
+%%{init: {"theme": "base"}}%%
 flowchart TD
   %% Streaming & Pagination Flow (Warlot SDK)
 
@@ -7,52 +7,52 @@ flowchart TD
   classDef io fill:#E3F2FD,stroke:#1565C0,stroke-width:1px,color:#0D47A1
   classDef dec fill:#FFF3E0,stroke:#F57C00,stroke-width:1px,color:#E65100
   classDef action fill:#FAFAFA,stroke:#616161,stroke-width:1px,color:#212121
-  classDef note fill:#FFFDE7,stroke:#FBC02D,stroke-dasharray: 3 3,color:#5D4037
+  classDef note fill:#FFFDE7,stroke:#FBC02D,color:#5D4037
   classDef err fill:#FFEBEE,stroke:#C62828,stroke-width:1px,color:#B71C1C
 
-  A[Start]:::op --> B{Expected result size?}:::dec
-  B -- "Small / bounded" --> C[Simple SELECT\nExecSQL → rows[] in memory]:::action --> Z[End]:::op
-  B -- "Large / unknown" --> D{Access pattern?}:::dec
-  D -- "Sequential scan" --> E[[Streaming path]]:::op
-  D -- "Paged navigation" --> F[[Pagination path]]:::op
+  A[Start]:::op --> B{"Expected result size?"}:::dec
+  B -- "Small or bounded" --> C["Simple SELECT; ExecSQL; rows kept in memory"]:::action --> Z[End]:::op
+  B -- "Large or unknown" --> D{"Access pattern?"}:::dec
+  D -- "Sequential scan" --> E["Streaming path"]:::op
+  D -- "Paged navigation" --> F["Pagination path"]:::op
 
   %% --- Streaming path ---
-  subgraph STREAMING
+  subgraph Streaming
     direction TB
-    E --> S1[Build SELECT statement\n(no writes)]:::action
-    S1 --> S2[ExecSQLStream(ctx, project_id,\n{ sql, params })]:::io
-    S2 --> S3{HTTP status}:::dec
-    S3 -- "2xx" --> S4[Open response body,\ninit JSON decoder]:::action
-    S3 -- "429/5xx" --> S3a[Honor Retry-After,\nexponential backoff]:::note --> S2
-    S3 -- "4xx (other)" --> S3b[APIError (non-retriable)]:::err
+    E --> S1["Build SELECT statement (no writes)"]:::action
+    S1 --> S2["ExecSQLStream with project id and params"]:::io
+    S2 --> S3{"HTTP status"}:::dec
+    S3 -- "2xx" --> S4["Open body and start JSON decoder"]:::action
+    S3 -- "429 or 5xx" --> S3a["Honour Retry-After; exponential backoff"]:::note --> S2
+    S3 -- "other 4xx" --> S3b["API error (not retriable)"]:::err
 
-    S4 --> S5{Locate 'rows' array?}:::dec
-    S5 -- "Found" --> S6[for sc.Next(&row) {\n  process(row)\n}]:::action
-    S6 --> S7{sc.More()?}:::dec
+    S4 --> S5{"Find rows array"}:::dec
+    S5 -- "Found" --> S6["Process each row in a loop"]:::action
+    S6 --> S7{"More rows?"}:::dec
     S7 -- "yes" --> S6
-    S7 -- "no" --> S8[sc.Close(); check sc.Err()==nil]:::action --> S9[Success]:::op
+    S7 -- "no" --> S8["Close scanner; confirm no error"]:::action --> S9["Success"]:::op
 
-    S5 -- "Malformed JSON" --> S5e[sc.Err()!=nil]:::err --> S8
-    S6 -. backpressure .- S6note[Application controls pace:\nI/O, batching, workers]:::note
-    S2 -. non-idempotent writes not streamed .- S2note[Streaming is read-oriented;\nretries occur only at request boundary]:::note
+    S5 -- "Malformed JSON" --> S5e["Decoder error"]:::err --> S8
+    S2 -.-> S2note["Streaming is read oriented; retries happen per request"]:::note
   end
 
   %% --- Pagination path ---
-  subgraph PAGINATION
+  subgraph Pagination
     direction TB
-    F --> P1[Initialize Pager\n{table, limit, offset=0}]:::action
-    P1 --> P2[resp = BrowseRows(limit, offset)]:::io
-    P2 --> P3{len(resp.rows)>0 ?}:::dec
-    P3 -- "yes" --> P4[Process batch]:::action --> P5[offset += len(rows)]:::action --> P2
-    P3 -- "no" --> P6[Done]:::op
-    P2 -. retriable .- P2note[429/5xx → SDK retries;\n'Retry-After' honored]:::note
+    F --> P1["Initialise pager: table, limit, offset = 0"]:::action
+    P1 --> P2["BrowseRows(limit, offset)"]:::io
+    P2 --> P3{"Any rows returned?"}:::dec
+    P3 -- "yes" --> P4["Process batch"]:::action --> P5["Increase offset by batch size"]:::action --> P2
+    P3 -- "no" --> P6["Done"]:::op
+    P2 -.-> P2note["SDK retries on 429 or 5xx; Retry After honoured"]:::note
   end
 
-  %% OUTCOMES
+  %% Outcomes
   S9 --> Z
   P6 --> Z
 
-  %% Global annotations
-  Z -.-> N1[Memory: Streaming is O(1) per row;\nPagination is O(limit) per page]:::note
-  Z -.-> N2[Resource hygiene: always Close() scanner;\ncheck Err() after loop]:::note
+  %% Global notes
+  Z -.-> N1["Memory: streaming is O(1) per row; pagination is O(limit) per page"]:::note
+  Z -.-> N2["Hygiene: always close the scanner and check for errors"]:::note
+
 ```

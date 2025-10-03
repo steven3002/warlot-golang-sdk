@@ -82,20 +82,21 @@ go test ./warlot -v -run TestE2E_Live -count=1
 ## E2E flow
 
 ```mermaid
-%%{init: {'theme': 'base'}}%%
+%%{init: {"theme": "base"}}%%
 flowchart TD
-  A[Start E2E] --> B[Warmup resolve]
-  B --> C{Resolve hit?}
-  C -->|yes| D[Use project_id]
-  C -->|no| E[Init project]
+  A["Start E2E"] --> B["Warmup resolve"]
+  B --> C{"Resolve hit?"}
+  C -->|yes| D["Use project_id"]
+  C -->|no| E["Init project"]
   E --> D
-  D --> F[Issue API key]
-  F --> G[CREATE TABLE]
-  G --> H[INSERT (idempotent)]
-  H --> I[SELECT (typed mapping)]
-  I --> J[Count tables]
-  J --> K[Commit]
-  K --> L[Success]
+  D --> F["Issue API key"]
+  F --> G["CREATE TABLE"]
+  G --> H["INSERT (idempotent)"]
+  H --> I["SELECT (typed mapping)"]
+  I --> J["Count tables"]
+  J --> K["Commit"]
+  K --> L["Success"]
+
 ```
 
 ---

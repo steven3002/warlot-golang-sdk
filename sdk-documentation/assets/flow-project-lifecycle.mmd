@@ -1,5 +1,5 @@
 ```mermaid
-%%{init: {'theme': 'base'}}%%
+%%{init: {"theme": "base"}}%%
 flowchart TD
   %% Project lifecycle flow (Warlot SDK)
 
@@ -7,34 +7,35 @@ flowchart TD
   classDef io fill:#E3F2FD,stroke:#1565C0,stroke-width:1px,color:#0D47A1
   classDef dec fill:#FFF3E0,stroke:#F57C00,stroke-width:1px,color:#E65100
   classDef action fill:#FAFAFA,stroke:#616161,stroke-width:1px,color:#212121
-  classDef note fill:#FFFDE7,stroke:#FBC02D,stroke-dasharray: 3 3,color:#5D4037
+  classDef note fill:#FFFDE7,stroke:#FBC02D,color:#5D4037
 
-  A[Start]:::op --> B[Resolve Project\nPOST /warlotSql/projects/resolve]:::io
-  B --> C{Project exists?}:::dec
-  C -- "Yes" --> D[Use project_id / db_id]:::action
-  C -- "No" --> E[Initialize Project\nPOST /warlotSql/projects/init]:::io --> D
+  A[Start]:::op --> B["Resolve project\nPOST /warlotSql/projects/resolve"]:::io
+  B --> C{"Project exists?"}:::dec
+  C -- "Yes" --> D["Use project_id and db_id"]:::action
+  C -- "No" --> E["Initialise project\nPOST /warlotSql/projects/init"]:::io --> D
 
-  D --> F[Issue API Key\nPOST /auth/issue]:::io
-  F --> G[Configure Client\nSet BaseURL, x-api-key,\nx-holder-id, x-project-name]:::action
+  D --> F["Issue API key\nPOST /auth/issue"]:::io
+  F --> G["Configure client\nBaseURL, x-api-key,\nx-holder-id, x-project-name"]:::action
 
-  subgraph Runtime Operations
+  subgraph "Runtime operations"
     direction TB
-    G --> H[CREATE/ALTER TABLE (DDL)\nPOST /projects/{id}/sql\nBody: { sql, params: [] }]:::io
-    H --> I[INSERT/UPDATE/DELETE (DML)\nPOST /projects/{id}/sql\nHeader: x-idempotency-key]:::io
-    I --> J[SELECT\nPOST /projects/{id}/sql\nReturns: { ok:true, rows:[…] }]:::io
-    J --> K{Large result set?}:::dec
-    K -- "Yes" --> L[Stream rows\nExecSQLStream → RowScanner]:::action
-    K -- "No" --> M[Paginate\nBrowseRows / Pager]:::action
-    H -. optional .-> N[Migrations Up\nApply *.sql; track in _migrations]:::action
-    J --> O[List Tables / Schema / Count / Status]:::action
+    G --> H["DDL: CREATE or ALTER TABLE\nPOST /projects/:id/sql\nBody: sql + params"]:::io
+    H --> I["DML: INSERT, UPDATE, DELETE\nPOST /projects/:id/sql\nHeader: x-idempotency-key"]:::io
+    I --> J["SELECT\nPOST /projects/:id/sql\nReturns: ok + rows list"]:::io
+    J --> K{"Large result set?"}:::dec
+    K -- "Yes" --> L["Stream rows\nExecSQLStream to RowScanner"]:::action
+    K -- "No" --> M["Paginate\nBrowseRows or Pager"]:::action
+    H -. optional .-> N["Migrations Up\nApply *.sql; track in _migrations"]:::action
+    J --> O["List tables, schema, count, status"]:::action
   end
 
-  O --> P[Commit Project\nPOST /projects/{id}/commit]:::io
+  O --> P["Commit project\nPOST /projects/:id/commit"]:::io
   P --> Q[End]:::op
 
-  %% Reliability & security annotations
-  F -.-> R[Rate limit handling\n429/5xx → Retry with jitter;\nhonor Retry-After]:::note
-  I -.-> S[Write safety\nIdempotency via x-idempotency-key]:::note
-  J -.-> T[Typed mapping\nQuery[T] for SELECT results]:::note
-  P -.-> U[Chain artifacts\nTxDigest, SignatureHex, CSV/Digest hex]:::note
+  %% Reliability & security notes
+  F -.-> R["Rate limits\n429 or 5xx: retry with jitter; honour Retry-After"]:::note
+  I -.-> S["Write safety via x-idempotency-key"]:::note
+  J -.-> T["Typed mapping (generic) for SELECT"]:::note
+  P -.-> U["Chain artefacts\nTxDigest, SignatureHex, CSV/Digest hex"]:::note
+
 ```

@@ -130,14 +130,16 @@ _, err := proj.SQL(ctx, `INSERT INTO products(name,price) VALUES(?,?)`,
 ### Retry state (flow)
 
 ```mermaid
-%%{init: {'theme': 'base'}}%%
+%%{init: {"theme": "base"}}%%
 flowchart LR
   S[Send request] --> R{Response}
   R -->|2xx| E[Return success]
-  R -->|429/5xx| D[Compute delay (max(jitter, Retry-After))]
+  R -->|429 or 5xx| D["Compute delay: max(jitter, Retry-After)"]
   D --> W[Wait or cancel on context]
   W --> S2[Retry request]
-  R -->|4xx (except 429)| F[Return APIError]
+  S2 --> S
+  R -->|4xx except 429| F[Return API error]
+
 ```
 
 Tuning example:

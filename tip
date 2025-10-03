@@ -1,2 +1,0 @@
-we will use this 
-./warlotctl issue-key -project "3c58bfc5-64a9-45ff-9510-a6584ee96248" -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" -user "$WARLOT_OWNER"

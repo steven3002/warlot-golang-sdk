@@ -82,12 +82,13 @@ type SQLResponse struct {
 **Flow (execution result):**
 
 ```mermaid
-%%{init: {'theme': 'base'}}%%
+%%{init: {"theme": "base"}}%%
 flowchart TD
   A[ExecSQL] --> B{Statement type}
-  B -->|DDL/DML| C[Return ok + row_count]
-  B -->|SELECT| D[Return ok + rows[]]
-  B -->|Error| E[Return error (APIError or SQL error)]
+  B -->|DDL or DML| C["Return ok + row\_count"]
+  B -->|SELECT| D["Return ok + rows[]"]
+  B -->|Error| E["Return error (APIError or SQL error)"]
+
 ```
 
 ---

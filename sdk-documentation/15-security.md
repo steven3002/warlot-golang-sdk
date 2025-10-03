@@ -51,13 +51,14 @@ This section documents security-relevant behavior in the Warlot Go SDK and provi
 ### Key lifecycle (flow)
 
 ```mermaid
-%%{init: {'theme': 'base'}}%%
+%%{init: {"theme": "base"}}%%
 flowchart TD
-  A[Resolve or Init Project] --> B[Issue API Key for project_id]
-  B --> C[Store API Key in secret store / env]
-  C --> D[Configure SDK Client fields]
-  D --> E[Periodic rotation (schedule)]
-  E --> F[Replace in deployment and revoke/expire previous key]
+  A["Resolve or Init Project"] --> B["Issue API Key for project\_id"]
+  B --> C["Store API Key in secret store / env"]
+  C --> D["Configure SDK Client fields"]
+  D --> E["Periodic rotation (schedule)"]
+  E --> F["Replace in deployment and revoke/expire previous key"]
+
 ```
 
 **Operational guidance**

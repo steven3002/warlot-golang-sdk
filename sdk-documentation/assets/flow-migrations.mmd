@@ -1,5 +1,5 @@
 ```mermaid
-%%{init: {'theme': 'base'}}%%
+%%{init: {"theme": "base"}}%%
 flowchart TD
   %% File-based SQL migrations (Warlot SDK Migrator.Up)
 
@@ -7,27 +7,27 @@ flowchart TD
   classDef io fill:#E3F2FD,stroke:#1565C0,stroke-width:1px,color:#0D47A1
   classDef dec fill:#FFF3E0,stroke:#F57C00,stroke-width:1px,color:#E65100
   classDef action fill:#FAFAFA,stroke:#616161,stroke-width:1px,color:#212121
-  classDef note fill:#FFFDE7,stroke:#FBC02D,stroke-dasharray: 3 3,color:#5D4037
+  classDef note fill:#FFFDE7,stroke:#FBC02D,color:#5D4037
   classDef err fill:#FFEBEE,stroke:#C62828,stroke-width:1px,color:#B71C1C
 
-  A[Start]:::op --> B[Ensure ledger table\nCREATE TABLE IF NOT EXISTS _migrations\n(id TEXT PRIMARY KEY,\napplied_at TEXT NOT NULL)]:::io
-  B --> C[Read dir from fs.FS\nFilter *.sql files\nSort ascending by filename]:::action
-  C --> D[Load applied set\nSELECT id FROM _migrations]:::io
+  A[Start]:::op --> B["Ensure migrations table"]:::io
+  B --> C["Read directory, select SQL files, sort ascending"]:::action
+  C --> D["Load applied ids from ledger"]:::io
 
-  D --> E{Files remaining?}:::dec
-  E -- "No" --> X[No-op; return applied=[]]:::op
-  E -- "Yes" --> F[Iterate files in order]:::action
+  D --> E{"Files remaining?"}:::dec
+  E -- "No" --> X["No-op, return applied list"]:::op
+  E -- "Yes" --> F["Iterate files in order"]:::action
 
-  F --> G{Current file in applied set?}:::dec
-  G -- "Yes" --> F1[Skip; continue]:::action --> F
-  G -- "No" --> H[Read file content from fs.FS]:::io
-  H --> I[Execute SQL text\nExecSQL(project, {sql, params:[]})\nHeader: x-idempotency-key = "mig-"+filename]:::io
-  I --> J{Execution successful?}:::dec
+  F --> G{"Already applied?"}:::dec
+  G -- "Yes" --> F1["Skip and continue"]:::action --> F
+  G -- "No" --> H["Read file content"]:::io
+  H --> I["Execute SQL (idempotency header set)"]:::io
+  I --> J{"Execution successful?"}:::dec
 
-  J -- "Yes" --> K[Insert ledger row\nINSERT INTO _migrations(id,applied_at)\nVALUES (filename, now_utc)]:::io
+  J -- "Yes" --> K["Insert into ledger with timestamp"]:::io
   K --> F
 
-  J -- "No" --> E1[Stop processing;\nreturn error with failing filename]:::err
+  J -- "No" --> E1["Stop and return error with filename"]:::err
 
   F --> E
 
@@ -35,8 +35,9 @@ flowchart TD
   E1 --> Z
 
   %% Annotations
-  B -.-> N1[Ledger ensures exactly-once semantics per file]:::note
-  C -.-> N2[Only files ending with .sql are considered; subdirectories ignored]:::note
-  I -.-> N3[Idempotency header prevents duplicates across retries]:::note
-  E1 -.-> N4[Previously applied migrations remain committed; no global rollback]:::note
+  B -.-> N1["Ledger enables exactly-once per file"]:::note
+  C -.-> N2["Only top-level .sql files considered"]:::note
+  I -.-> N3["Idempotency header prevents duplicates on retry"]:::note
+  E1 -.-> N4["Previously applied steps remain committed"]:::note
+
 ```

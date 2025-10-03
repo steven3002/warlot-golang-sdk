@@ -29,18 +29,19 @@ End-to-end walk-through for creating a project (or resolving an existing one), i
 ## Lifecycle at a glance
 
 ```mermaid
-%%{init: {'theme': 'base'}}%%
+%%{init: {"theme": "base"}}%%
 flowchart TD
   A[Start] --> B{Resolve project}
-  B -->|found| C[Use project_id]
+  B -->|found| C["Use project_id"]
   B -->|not found| D[Init project]
   D --> C
   C --> E[Issue API key]
-  E --> F[Execute SQL (DDL/DML/SELECT)]
+  E --> F["Execute SQL (DDL/DML/SELECT)"]
   F --> G{Persist to chain?}
   G -->|yes| H[Commit]
   G -->|no| I[Finish]
   H --> I
+
 ```
 
 ---

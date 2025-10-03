@@ -16,21 +16,23 @@ Schema changes are applied through a minimal migration facility built into the S
 ## Flow
 
 ```mermaid
-%%{init: {'theme': 'base'}}%%
+%%{init: {"theme": "base"}}%%
 flowchart TD
-  A[Start Up()] --> B[Ensure _migrations table]
-  B --> C[Read dir, filter *.sql]
-  C --> D[Sort by filename ASC]
-  D --> E[Load applied IDs from _migrations]
-  E --> F{Next filename unapplied?}
-  F -->|no| G[Skip file] --> F
-  F -->|yes| H[Read file & ExecSQL with idempotency key]
-  H --> I{Exec success?}
-  I -->|no| J[Return error with applied subset]
-  I -->|yes| K[INSERT into _migrations(id, applied_at)]
+  A["Start Up()"] --> B["Ensure _migrations table"]
+  B --> C["Read dir, filter *.sql"]
+  C --> D["Sort by filename ASC"]
+  D --> E["Load applied IDs from _migrations"]
+  E --> F{"Next filename unapplied?"}
+  F -->|no| G["Skip file"]
+  G --> F
+  F -->|yes| H["Read file & ExecSQL with idempotency key"]
+  H --> I{"Exec success?"}
+  I -->|no| J["Return error with applied subset"]
+  I -->|yes| K["INSERT into _migrations(id, applied_at)"]
   K --> F
-  G --> L[Done if none left]
-  F -->|none left| L[Done]
+  G --> L["Done if none left"]
+  F -->|none left| L["Done"]
+
 ```
 
 ---

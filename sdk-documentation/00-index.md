@@ -48,18 +48,22 @@ The Warlot Go SDK provides a typed, production-grade interface to the Warlot SQL
 ## Lifecycle flow
 
 ```mermaid
-%%{init: {'theme': 'base'}}%%
+
+%%{init: {"theme": "base"}}%%
 flowchart TD
   A[Start] --> B{Resolve project}
   B -->|found| C[Use project_id]
   B -->|not found| D[Init project]
   D --> C
   C --> E[Issue API key]
-  E --> F[Execute SQL (DDL/DML/SELECT)]
+  E --> F["Execute SQL (DDL/DML/SELECT)"]
   F --> G{Need to persist to chain?}
   G -->|yes| H[Commit project]
   G -->|no| I[End]
-  H --> I[End]
+  H --> I
+
+
+
 ```
 
 ---

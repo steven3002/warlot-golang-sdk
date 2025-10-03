@@ -31,15 +31,16 @@ Handling large result sets efficiently is critical for production workloads. The
 ### Sequence diagram
 
 ```mermaid
-%%{init: {'theme': 'base'}}%%
+%%{init: {"theme": "base"}}%%
 flowchart TD
   A[ExecSQLStream] --> B[HTTP 200 + JSON body starts]
-  B --> C{Find "rows" array}
+  B --> C{Find rows array}
   C -->|found| D[Decode next element into dst]
   D --> E{More elements?}
   E -->|yes| D
-  E -->|no| F[Consume closing ']' and close]
-  C -->|not found / malformed| G[Error → Close]
+  E -->|no| F[Consume closing bracket and close]
+  C -->|not found or malformed| G[Error -> Close]
+
 ```
 
 ### Code example

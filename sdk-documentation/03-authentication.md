@@ -27,14 +27,15 @@ All database operations require the following HTTP headers. The SDK attaches the
 API keys are issued per project via the `/auth/issue` endpoint. Typical lifecycle:
 
 ```mermaid
-%%{init: {'theme': 'base'}}%%
+%%{init: {"theme": "base"}}%%
 flowchart TD
-  A[Resolve project] -->|found| B[project_id available]
+  A[Resolve project] -->|found| B["project_id available"]
   A -->|not found| C[Init project]
   C --> B
-  B --> D[Issue API key (/auth/issue)]
+  B --> D["Issue API key (/auth/issue)"]
   D --> E[Store key securely]
-  E --> F[Attach key in Client and perform DB ops]
+  E --> F["Attach key in client and perform DB ops"]
+
 ```
 
 ---

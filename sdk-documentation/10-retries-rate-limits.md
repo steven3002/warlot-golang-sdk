@@ -31,21 +31,22 @@ Reliable operation requires a clear policy for transient errors and rate limitin
 ## Flow
 
 ```mermaid
-%%{init: {'theme': 'base'}}%%
+%%{init: {"theme": "base"}}%%
 flowchart TD
-  A[Send request] --> B{Response / Error}
-  B -->|2xx| C[Success → return]
+  A[Send request] --> B{"Response or error"}
+  B -->|2xx| C[Return success]
   B -->|429 or 5xx| D[Compute delay]
-  D -->|Retry-After| E[Sleep until hint]
-  D -->|Else| F[Jittered exponential backoff]
-  E --> G[Attempt < Max?]
+  D -->|Retry-After header| E[Sleep until hint]
+  D -->|otherwise| F[Jittered exponential backoff]
+  E --> G{"Attempts remaining?"}
   F --> G
   G -->|yes| A
   G -->|no| H[Return last error]
-  B -->|4xx (not 429)| I[Return APIError]
-  B -->|Transport error| J{Retry eligible?}
+  B -->|4xx except 429| I[Return API error]
+  B -->|Transport error| J{"Retry eligible?"}
   J -->|yes| F
   J -->|no| H
+
 ```
 
 ---

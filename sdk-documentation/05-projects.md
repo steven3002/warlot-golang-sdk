@@ -29,15 +29,16 @@ Project lifecycle operations cover resolving an existing project, initializing a
 ## Lifecycle (resolve-or-init)
 
 ```mermaid
-%%{init: {'theme': 'base'}}%%
+%%{init: {"theme": "base"}}%%
 flowchart TD
-  A[Start] --> B{Resolve by holder_id + project_name}
-  B -->|found| C[ProjectID available]
+  A[Start] --> B{"Resolve by holder\_id + project\_name"}
+  B -->|found| C[Project ID available]
   B -->|not found| D[Init project]
   D --> C
   C --> E[Issue API key]
-  E --> F[Attach key to Client for DB ops]
-  F --> G[Continue to SQL / tables / status / commit]
+  E --> F[Attach key to client for DB ops]
+  F --> G["Continue to SQL / tables / status / commit"]
+
 ```
 
 ---

@@ -150,14 +150,15 @@ All notable changes to this project are documented here. The SDK follows SemVer.
 ## Release flow
 
 ```mermaid
-%%{init: {'theme': 'base'}}%%
+%%{init: {"theme": "base"}}%%
 flowchart TD
-  A[Prepare release branch] --> B[Update Version, APIVersion if needed]
-  B --> C[Update CHANGELOG.md]
-  C --> D[Tag vX.Y.Z (annotated)]
-  D --> E[CI: build, test, sign, publish artifacts]
-  E --> F[Create GitHub Release with notes]
-  F --> G[Update docs site + examples]
+  A["Prepare release branch"] --> B["Update version and API version if needed"]
+  B --> C["Update CHANGELOG.md"]
+  C --> D["Tag vX.Y.Z (annotated)"]
+  D --> E["CI: build, test, sign, publish artefacts"]
+  E --> F["Create GitHub release with notes"]
+  F --> G["Update docs site and examples"]
+
 ```
 
 ---
