@@ -1,563 +1,235 @@
-# CLI (`warlotctl`)
+# CLI (`warlotdev`)
 
-A single-binary command-line interface for interacting with the Warlot SQL Database API during development, testing, and operational tasks. The CLI is built on top of the official Go SDK and mirrors the same request/response semantics.
 
----
+## A) Linux/macOS (bash/zsh)
 
-## Installation
-
-### Build from source
+### 1) Install the CLI from the published submodule tag
 
 ```bash
-# from repository root
-go build -o warlotctl ./warlot-go/cmd/warlotctl
-# verify
-./warlotctl -h
+go install github.com/steven3002/warlot-golang-sdk/warlot-go/cmd/warlotdev@v1.0.1
 ```
 
-*(If the CLI lives in a single file, adjust the path accordingly, for example `./warlot-go/warlotctl.go`.)*
-
----
-
-## Global behavior
-
-* Default output format is JSON emitted to `stdout`; errors are printed to `stderr`.
-* Exit codes:
-
-  * `0` on success
-  * `>0` on failure (transport errors, non-2xx HTTP, or SQL errors)
-* Authentication headers are auto-applied from environment variables and/or flags (see below).
-* Requests honor retry/backoff in the underlying SDK.
-
----
-
-## Environment variables
-
-| Variable                 | Purpose                   | Example                           |
-| ------------------------ | ------------------------- | --------------------------------- |
-| `WARLOT_BASE_URL`        | API base URL              | `https://warlot-api.onrender.com` |
-| `WARLOT_API_KEY`         | Default API key           | `a2f5…37e0`                       |
-| `WARLOT_HOLDER`          | Default holder identifier | `0x2e4a…7ba3`                     |
-| `WARLOT_PNAME`           | Default project name      | `project_alpha`                   |
-| `WARLOT_TIMEOUT`         | Request timeout (seconds) | `90`                              |
-| `WARLOT_RETRIES`         | Max retries for 429/5xx   | `6`                               |
-| `WARLOT_BACKOFF_INIT_MS` | Initial backoff (ms)      | `500`                             |
-| `WARLOT_BACKOFF_MAX_MS`  | Max backoff (ms)          | `8000`                            |
-
----
-
-## Global flags
-
-These flags can appear before any subcommand:
-
-| Flag            | Description                                                | Default                              |
-| --------------- | ---------------------------------------------------------- | ------------------------------------ |
-| `-base`         | Base URL (overrides `WARLOT_BASE_URL`)                     | autodetected from env or SDK default |
-| `-apikey`       | API key (overrides `WARLOT_API_KEY`)                       | empty                                |
-| `-holder`       | Holder ID (overrides `WARLOT_HOLDER`)                      | empty                                |
-| `-pname`        | Project name (overrides `WARLOT_PNAME`)                    | empty                                |
-| `-timeout`      | Timeout in seconds (overrides `WARLOT_TIMEOUT`)            | 30                                   |
-| `-retries`      | Max retries (overrides `WARLOT_RETRIES`)                   | 3                                    |
-| `-backoff-init` | Initial backoff in ms (overrides `WARLOT_BACKOFF_INIT_MS`) | 300                                  |
-| `-backoff-max`  | Max backoff in ms (overrides `WARLOT_BACKOFF_MAX_MS`)      | 3000                                 |
-| `-pretty`       | Pretty-print JSON output                                   | false                                |
-| `-ua`           | Custom User-Agent suffix                                   | empty                                |
-
-Example:
+### 2) Ensure the binary is on PATH (current shell + future sessions)
 
 ```bash
-./warlotctl -base "$WARLOT_BASE_URL" -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" -pretty resolve
+export PATH="$(go env GOBIN):$(go env GOPATH)/bin:$PATH"
+printf '\nexport PATH="$(go env GOBIN):$(go env GOPATH)/bin:$PATH"\n' >> ~/.bashrc 2>/dev/null || true
+printf '\nexport PATH="$(go env GOBIN):$(go env GOPATH)/bin:$PATH"\n' >> ~/.zshrc  2>/dev/null || true
+hash -r 2>/dev/null || true
+warlotdev -h
 ```
 
----
-
-## Commands
-
-### 1) `resolve`
-
-Resolve a project by `(holder_id, project_name)`.
+### 3) Baseline configuration (environment defaults)
 
 ```bash
-./warlotctl resolve [-holder H] [-pname N]
+export WARLOT_BASE_URL="https://warlot-api.onrender.com"
+export WARLOT_HOLDER="REPLACE_WITH_HOLDER_ID"
+export WARLOT_PNAME="REPLACE_WITH_PROJECT_NAME"
+export WARLOT_TIMEOUT="90"
+export WARLOT_RETRIES="6"
+export WARLOT_BACKOFF_INIT_MS="500"
+export WARLOT_BACKOFF_MAX_MS="8000"
 ```
 
-**Output (example):**
-
-```json
-{
-  "exists_meta": true,
-  "exists_chain": true,
-  "project_id": "3c58bfc5-64a9-45ff-9510-a6584ee96248",
-  "db_id": "24840e28-14c6-46ea-a313-2d6d3e32e3ef",
-  "action": "ready"
-}
-```
-
-**Notes:** Legacy fields `ProjectID`/`DBID` may be normalized in the CLI output.
-
----
-
-### 2) `init`
-
-Initialize a new project.
+### 4) Project bootstrap: resolve → init (if needed) → issue API key
 
 ```bash
-./warlotctl init -holder H -pname N -owner O [--include-pass] [--deletable]
-```
+set -euo pipefail
 
-**Flags:**
+# Resolve by (holder, project name)
+RESOLVE_JSON="$(warlotdev -base "$WARLOT_BASE_URL" -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" resolve)"
+echo "$RESOLVE_JSON" | jq -C .
 
-| Flag                                                                          | Description                       | Default  |
-| ----------------------------------------------------------------------------- | --------------------------------- | -------- |
-| `-owner`                                                                      | Owner address                     | required |
-| `--include-pass`                                                              | Include writer pass               | true     |
-| `--deletable`                                                                 | Mark project as deletable         | true     |
-| `-epoch-set` `-cycle-end` `-writers-len` `-track-back-len` `-draft-epoch-dur` | Advanced fields mirrored from API | 0        |
+# Extract project id; support legacy fields if present
+PROJECT_ID="$(echo "$RESOLVE_JSON" | jq -r '.project_id // .ProjectID // empty')"
 
-**Output (example):**
-
-```json
-{
-  "ProjectID":"d4652d80-083b-4807-9c23-a85e5deeb3f0",
-  "DBID":"0x3adaecee0ae0653f0ee844ed9e58744facdcd643ca754951c23f1ceaf9bb8044",
-  "WriterPassID":"",
-  "BlobID":"",
-  "TxDigest":"",
-  "CSVHashHex":"",
-  "DigestHex":"",
-  "SignatureHex":""
-}
-```
-
----
-
-### 3) `issue-key`
-
-Issue an API key for a specific project.
-
-```bash
-./warlotctl issue-key -project P -holder H -pname N -user U
-```
-
-**Output:**
-
-```json
-{ "apiKey": "6f80...84aa", "url": "https://api.warlot.com/3c58bfc5-..." }
-```
-
-**Tip:** Export the key for subsequent operations:
-
-```bash
-export WARLOT_API_KEY=$(./warlotctl issue-key -project "$P" -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" -user "$WARLOT_OWNER" | jq -r .apiKey)
-```
-
----
-
-### 4) `sql`
-
-Execute an SQL statement against a project.
-
-```bash
-./warlotctl sql -project P -q 'SQL...' [-params 'JSON-ARRAY'] [-idempotency K]
-```
-
-**Flags:**
-
-| Flag           | Description              | Example                    |
-| -------------- | ------------------------ | -------------------------- |
-| `-q`           | SQL statement (required) | `'SELECT * FROM products'` |
-| `-params`      | JSON array of parameters | `'["Laptop", 999.99]'`     |
-| `-idempotency` | Idempotency key header   | `insert-2025-10-03-01`     |
-
-**Responses:**
-
-* DDL/DML:
-
-  ```json
-  {"ok": true, "row_count": 1}
-  ```
-* SELECT:
-
-  ```json
-  {"ok": true, "rows": [{"id":1,"name":"X","price":1.23}]}
-  ```
-
----
-
-### 5) `tables list`
-
-List all tables in a project.
-
-```bash
-./warlotctl tables list -project P
-```
-
-**Output:**
-
-```json
-{"tables": ["products","categories"]}
-```
-
----
-
-### 6) `tables rows`
-
-Browse rows with pagination.
-
-```bash
-./warlotctl tables rows -project P -table T [-limit N] [-offset M]
-```
-
-**Output:**
-
-```json
-{
-  "limit": 2,
-  "offset": 0,
-  "table": "products",
-  "rows": [{"id":1,"name":"A"},{"id":2,"name":"B"}]
-}
-```
-
----
-
-### 7) `schema`
-
-Fetch a table schema.
-
-```bash
-./warlotctl schema -project P -table T
-```
-
-**Output:** Arbitrary JSON describing table columns and types (gateway-defined).
-
----
-
-### 8) `count`
-
-Return total number of tables.
-
-```bash
-./warlotctl count -project P
-```
-
-**Output:**
-
-```json
-{"project_id":"P","table_count": 3}
-```
-
----
-
-### 9) `status`
-
-Fetch project status.
-
-```bash
-./warlotctl status -project P
-```
-
-**Output:** Arbitrary JSON (gateway-defined).
-
----
-
-### 10) `commit`
-
-Commit project changes to chain.
-
-```bash
-./warlotctl commit -project P
-```
-
-**Output:** Gateway-defined JSON commit receipt.
-
----
-
-## Examples
-
-**Resolve or init → issue key → create table**
-
-```bash
-# Resolve
-./warlotctl resolve -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" | tee resolve.json
-
-# If project_id is absent, initialize
-P=$(jq -r '.project_id // empty' resolve.json)
-if [ -z "$P" ]; then
-  P=$(./warlotctl init -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" -owner "$WARLOT_OWNER" | jq -r .ProjectID)
+# Initialize if not present
+if [ -z "${PROJECT_ID}" ] ; then
+  OWNER_ADDR="REPLACE_WITH_OWNER_ADDRESS"
+  INIT_JSON="$(warlotdev -base "$WARLOT_BASE_URL" -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" init -owner "$OWNER_ADDR")"
+  echo "$INIT_JSON" | jq -C .
+  PROJECT_ID="$(echo "$INIT_JSON" | jq -r '.ProjectID')"
 fi
-echo "PROJECT_ID=$P"
 
-# Issue key
-export WARLOT_API_KEY=$(./warlotctl issue-key -project "$P" -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" -user "$WARLOT_OWNER" | jq -r .apiKey)
+# Issue API key bound to the project
+USER_ADDR="REPLACE_WITH_USER_ADDRESS"
+ISSUE_JSON="$(warlotdev -base "$WARLOT_BASE_URL" -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" issue-key -project "$PROJECT_ID" -user "$USER_ADDR")"
+echo "$ISSUE_JSON" | jq -C .
+export WARLOT_API_KEY="$(echo "$ISSUE_JSON" | jq -r '.apiKey')"
 
-# Create table
-./warlotctl sql -project "$P" \
-  -q 'CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, price REAL)'
+echo "PROJECT_ID=$PROJECT_ID"
+echo "WARLOT_API_KEY set"
 ```
 
-**Insert with idempotency and query**
+### 5) Basic operations (schema + data + status + commit)
 
 ```bash
-./warlotctl sql -project "$P" \
+# Create a table
+warlotdev -apikey "$WARLOT_API_KEY" -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" \
+  sql -project "$PROJECT_ID" \
+  -q 'CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, price REAL)'
+
+# Insert with idempotency (safe on retries)
+warlotdev -apikey "$WARLOT_API_KEY" -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" \
+  sql -project "$PROJECT_ID" \
   -q 'INSERT INTO products (name, price) VALUES (?, ?)' \
   -params '["Laptop", 999.99]' \
-  -idempotency 'cli-insert-1'
+  -idempotency 'cli-insert-001'
 
-./warlotctl sql -project "$P" \
+# Query rows
+warlotdev -apikey "$WARLOT_API_KEY" -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" \
+  sql -project "$PROJECT_ID" \
   -q 'SELECT id, name, price FROM products ORDER BY id'
+
+# List tables
+warlotdev -apikey "$WARLOT_API_KEY" -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" \
+  tables list -project "$PROJECT_ID"
+
+# Browse with pagination
+warlotdev -apikey "$WARLOT_API_KEY" -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" \
+  tables browse -project "$PROJECT_ID" -table products -limit 10 -offset 0
+
+# Project status
+warlotdev -apikey "$WARLOT_API_KEY" -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" \
+  status -project "$PROJECT_ID"
+
+# Commit changes to chain-backed storage
+warlotdev -apikey "$WARLOT_API_KEY" -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" \
+  commit -project "$PROJECT_ID"
 ```
 
-**Paginate rows**
+### 6) Optional maintenance
 
 ```bash
-./warlotctl tables rows -project "$P" -table products -limit 10 -offset 0 | jq .
-```
+# Verbose diagnostics (redacts API key)
+warlotdev -v -base "$WARLOT_BASE_URL" -holder "$WARLOT_HOLDER" -pname "$WARLOT_PNAME" resolve
 
-**Commit**
-
-```bash
-./warlotctl commit -project "$P" | jq .
-```
-
----
-
-## JSON shapes (reference)
-
-* **Resolve**: may include either modern fields (`exists_meta`, `exists_chain`, `project_id`, `db_id`, `action`) or legacy (`ProjectID`, `DBID`). The CLI normalizes both.
-* **Init**: matches `InitProjectResponse`.
-* **Issue key**: `{"apiKey": "...","url": "..."}`.
-* **SQL**: DDL/DML `{ok,row_count}`; SELECT `{ok,rows}`.
-* **Tables list**: `{"tables":["…"]}`.
-* **Rows**: `{"limit":N,"offset":M,"table":"T","rows":[...]}`.
-* **Count**: `{"project_id":"…","table_count":N}`.
-* **Status/Commit**: gateway-defined objects.
-
----
-
-## Type definitions (SDK excerpts used by the CLI)
-
-```go
-// Requests
-type ResolveProjectRequest struct {
-  HolderID    string `json:"holder_id"`
-  ProjectName string `json:"project_name"`
-}
-type InitProjectRequest struct {
-  HolderID      string `json:"holder_id"`
-  ProjectName   string `json:"project_name"`
-  OwnerAddress  string `json:"owner_address"`
-  EpochSet      int    `json:"epoch_set"`
-  CycleEnd      int    `json:"cycle_end"`
-  WritersLen    int    `json:"writers_len"`
-  TrackBackLen  int    `json:"track_back_len"`
-  DraftEpochDur int    `json:"draft_epoch_dur"`
-  IncludePass   bool   `json:"include_pass"`
-  Deletable     bool   `json:"deletable"`
-}
-type IssueKeyRequest struct {
-  ProjectID     string `json:"projectId"`
-  ProjectHolder string `json:"projectHolder"`
-  ProjectName   string `json:"projectName"`
-  User          string `json:"user"`
-}
-type SQLRequest struct {
-  SQL    string        `json:"sql"`
-  Params []interface{} `json:"params"`
-}
-
-// Responses
-type ResolveProjectResponse struct {
-  ExistsMeta      bool   `json:"exists_meta"`
-  ExistsChain     bool   `json:"exists_chain"`
-  ProjectID       string `json:"project_id"`
-  DBID            string `json:"db_id"`
-  Action          string `json:"action"`
-  LegacyProjectID string `json:"ProjectID,omitempty"`
-  LegacyDBID      string `json:"DBID,omitempty"`
-}
-type InitProjectResponse struct {
-  ProjectID    string `json:"ProjectID"`
-  DBID         string `json:"DBID"`
-  WriterPassID string `json:"WriterPassID"`
-  BlobID       string `json:"BlobID"`
-  TxDigest     string `json:"TxDigest"`
-  CSVHashHex   string `json:"CSVHashHex"`
-  DigestHex    string `json:"DigestHex"`
-  SignatureHex string `json:"SignatureHex"`
-}
-type IssueKeyResponse struct {
-  APIKey string `json:"apiKey"`
-  URL    string `json:"url"`
-}
-type SQLResponse struct {
-  OK       bool                     `json:"ok"`
-  RowCount *int                     `json:"row_count,omitempty"`
-  Rows     []map[string]interface{} `json:"rows,omitempty"`
-  Error    string                   `json:"error,omitempty"`
-}
-type ListTablesResponse struct {
-  Tables []string `json:"tables"`
-}
-type BrowseRowsResponse struct {
-  Limit  int                      `json:"limit"`
-  Offset int                      `json:"offset"`
-  Table  string                   `json:"table"`
-  Rows   []map[string]interface{} `json:"rows"`
-}
-type TableCountResponse struct {
-  ProjectID  string `json:"project_id"`
-  TableCount int    `json:"table_count"`
-}
+# Reinstall after a fresh release
+go clean -modcache
+go install github.com/steven3002/warlot-golang-sdk/warlot-go/cmd/warlotdev@v1.0.1
 ```
 
 ---
 
-## Tests (definitions)
+## B) Windows (PowerShell)
 
-The CLI can be tested with an `httptest.Server` that emulates the API, running the compiled binary with `os/exec`.
+### 1) Install the CLI from the published submodule tag
 
-### 1) Resolve prints normalized JSON
-
-```go
-// cli_resolve_test.go
-package cli_test
-
-import (
-  "bytes"
-  "net/http"
-  "net/http/httptest"
-  "os/exec"
-  "strings"
-  "testing"
-)
-
-func Test_CLI_Resolve_Normalized(t *testing.T) {
-  srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-    if r.URL.Path == "/warlotSql/projects/resolve" {
-      w.Header().Set("Content-Type", "application/json")
-      w.Write([]byte(`{"ProjectID":"P-1","DBID":"DB-1"}`)) // legacy
-      return
-    }
-    w.WriteHeader(404)
-  }))
-  defer srv.Close()
-
-  var out bytes.Buffer
-  cmd := exec.Command("./warlotctl", "-base", srv.URL, "resolve", "-holder", "H", "-pname", "N")
-  cmd.Stdout = &out
-  cmd.Stderr = &out
-  if err := cmd.Run(); err != nil {
-    t.Fatalf("run: %v\n%s", err, out.String())
-  }
-  s := out.String()
-  if !strings.Contains(s, `"project_id":"P-1"`) {
-    t.Fatalf("normalized project_id missing: %s", s)
-  }
-}
+```powershell
+go install github.com/steven3002/warlot-golang-sdk/warlot-go/cmd/warlotdev@v1.0.1
 ```
 
-### 2) SQL DDL returns `row_count`
+### 2) Ensure the binary is on PATH (persistent for User; current session updated)
 
-```go
-// cli_sql_rowcount_test.go
-package cli_test
+```powershell
+$bin = (go env GOBIN)
+if (!$bin) { $bin = (Join-Path (go env GOPATH) 'bin') }
 
-import (
-  "bytes"
-  "net/http"
-  "net/http/httptest"
-  "os/exec"
-  "strings"
-  "testing"
-)
-
-func Test_CLI_SQL_RowCount(t *testing.T) {
-  srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-    if strings.HasSuffix(r.URL.Path, "/sql") {
-      w.Header().Set("Content-Type", "application/json")
-      w.Write([]byte(`{"ok":true,"row_count":1}`))
-      return
-    }
-    w.WriteHeader(404)
-  }))
-  defer srv.Close()
-
-  var out bytes.Buffer
-  cmd := exec.Command("./warlotctl", "-base", srv.URL, "sql", "-project", "P", "-q", "CREATE TABLE t(x)")
-  cmd.Stdout = &out
-  cmd.Stderr = &out
-  if err := cmd.Run(); err != nil {
-    t.Fatalf("run: %v\n%s", err, out.String())
-  }
-  if !strings.Contains(out.String(), `"row_count":1`) {
-    t.Fatalf("row_count not present: %s", out.String())
-  }
+# Persist PATH (User)
+$current = [Environment]::GetEnvironmentVariable('PATH','User')
+if ($current -notlike "*$bin*") {
+  [Environment]::SetEnvironmentVariable('PATH', "$bin;$current", 'User')
 }
+# Update current session
+$env:PATH = "$bin;$env:PATH"
+
+warlotdev -h
 ```
 
-### 3) Tables list forwards auth headers from env
+### 3) Baseline configuration (environment defaults)
 
-```go
-// cli_tables_headers_test.go
-package cli_test
+```powershell
+$env:WARLOT_BASE_URL        = "https://warlot-api.onrender.com"
+$env:WARLOT_HOLDER          = "REPLACE_WITH_HOLDER_ID"
+$env:WARLOT_PNAME           = "REPLACE_WITH_PROJECT_NAME"
+$env:WARLOT_TIMEOUT         = "90"
+$env:WARLOT_RETRIES         = "6"
+$env:WARLOT_BACKOFF_INIT_MS = "500"
+$env:WARLOT_BACKOFF_MAX_MS  = "8000"
+```
 
-import (
-  "bytes"
-  "net/http"
-  "net/http/httptest"
-  "os"
-  "os/exec"
-  "testing"
-)
+### 4) Project bootstrap: resolve → init (if needed) → issue API key
 
-func Test_CLI_AuthHeaders_FromEnv(t *testing.T) {
-  seen := make(map[string]string)
-  srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-    seen["x-api-key"] = r.Header.Get("x-api-key")
-    seen["x-holder-id"] = r.Header.Get("x-holder-id")
-    seen["x-project-name"] = r.Header.Get("x-project-name")
-    w.Header().Set("Content-Type", "application/json")
-    w.Write([]byte(`{"tables":["t"]}`))
-  }))
-  defer srv.Close()
+```powershell
+# Resolve by (holder, project name)
+$res = warlotdev -base $env:WARLOT_BASE_URL -holder $env:WARLOT_HOLDER -pname $env:WARLOT_PNAME resolve
+$res | Out-String
 
-  var out bytes.Buffer
-  cmd := exec.Command("./warlotctl", "-base", srv.URL, "tables", "list", "-project", "P")
-  cmd.Stdout = &out
-  cmd.Stderr = &out
-  cmd.Env = append(os.Environ(),
-    "WARLOT_API_KEY=K",
-    "WARLOT_HOLDER=H",
-    "WARLOT_PNAME=N",
-  )
-  if err := cmd.Run(); err != nil {
-    t.Fatalf("run: %v\n%s", err, out.String())
-  }
-  if seen["x-api-key"] != "K" || seen["x-holder-id"] != "H" || seen["x-project-name"] != "N" {
-    t.Fatalf("headers not forwarded: %#v", seen)
-  }
+# Extract project id; support legacy keys
+$projectId = ($res | ConvertFrom-Json).project_id
+if (-not $projectId) { $projectId = ($res | ConvertFrom-Json).ProjectID }
+
+# Initialize if not present
+if (-not $projectId) {
+  $owner = "REPLACE_WITH_OWNER_ADDRESS"
+  $init = warlotdev -base $env:WARLOT_BASE_URL -holder $env:WARLOT_HOLDER -pname $env:WARLOT_PNAME init -owner $owner
+  $projectId = ($init | ConvertFrom-Json).ProjectID
 }
+
+# Issue API key bound to the project
+$user = "REPLACE_WITH_USER_ADDRESS"
+$issue = warlotdev -base $env:WARLOT_BASE_URL -holder $env:WARLOT_HOLDER -pname $env:WARLOT_PNAME issue-key -project $projectId -user $user
+$env:WARLOT_API_KEY = ($issue | ConvertFrom-Json).apiKey
+
+"PROJECT_ID=$projectId"
+"Set WARLOT_API_KEY"
+```
+
+### 5) Basic operations (schema + data + status + commit)
+
+```powershell
+# Create a table
+warlotdev -apikey $env:WARLOT_API_KEY -holder $env:WARLOT_HOLDER -pname $env:WARLOT_PNAME `
+  sql -project $projectId `
+  -q 'CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, price REAL)'
+
+# Insert with idempotency
+warlotdev -apikey $env:WARLOT_API_KEY -holder $env:WARLOT_HOLDER -pname $env:WARLOT_PNAME `
+  sql -project $projectId `
+  -q 'INSERT INTO products (name, price) VALUES (?, ?)' `
+  -params '["Laptop", 999.99]' `
+  -idempotency 'cli-insert-001'
+
+# Query rows
+warlotdev -apikey $env:WARLOT_API_KEY -holder $env:WARLOT_HOLDER -pname $env:WARLOT_PNAME `
+  sql -project $projectId `
+  -q 'SELECT id, name, price FROM products ORDER BY id'
+
+# List tables
+warlotdev -apikey $env:WARLOT_API_KEY -holder $env:WARLOT_HOLDER -pname $env:WARLOT_PNAME `
+  tables list -project $projectId
+
+# Browse with pagination
+warlotdev -apikey $env:WARLOT_API_KEY -holder $env:WARLOT_HOLDER -pname $env:WARLOT_PNAME `
+  tables browse -project $projectId -table products -limit 10 -offset 0
+
+# Project status
+warlotdev -apikey $env:WARLOT_API_KEY -holder $env:WARLOT_HOLDER -pname $env:WARLOT_PNAME `
+  status -project $projectId
+
+# Commit changes
+warlotdev -apikey $env:WARLOT_API_KEY -holder $env:WARLOT_HOLDER -pname $env:WARLOT_PNAME `
+  commit -project $projectId
+```
+
+### 6) Optional maintenance
+
+```powershell
+# Verbose diagnostics (redacts API key)
+warlotdev -v -base $env:WARLOT_BASE_URL -holder $env:WARLOT_HOLDER -pname $env:WARLOT_PNAME resolve
+
+# Reinstall after a fresh release
+go clean -modcache
+go install github.com/steven3002/warlot-golang-sdk/warlot-go/cmd/warlotdev@v1.0.1
 ```
 
 ---
 
-## Troubleshooting
+**Placeholders to replace before use**
 
-| Symptom                          | Likely cause                      | Action                                                           |
-| -------------------------------- | --------------------------------- | ---------------------------------------------------------------- |
-| `missing required -project`      | Flag omitted                      | Provide `-project` for project-bound commands                    |
-| `401/403 Unauthorized/Forbidden` | API key missing or scope mismatch | Issue key via `issue-key`; confirm `-holder` and `-pname`        |
-| `429 Too Many Requests`          | Rate limits                       | Reduce call rate; rely on retries; add `-idempotency` for writes |
-| `500 Internal Server Error`      | Transient                         | Retry, or increase `-retries` / backoff settings                 |
-| `context deadline exceeded`      | Timeout too small                 | Increase `-timeout` or use environment overrides                 |
+* `REPLACE_WITH_HOLDER_ID` – chain holder identifier
+* `REPLACE_WITH_PROJECT_NAME` – project name label
+* `REPLACE_WITH_OWNER_ADDRESS` – owner address for initialization
+* `REPLACE_WITH_USER_ADDRESS` – user address for API key issuance
 
----
-
-## Related topics
-
-* Authentication and headers: `03-authentication.md`
-* Configuration knobs and retry/backoff: `04-configuration.md`, `10-retries-rate-limits.md`
-* SQL execution model: `06-sql.md`
-* Streaming and pagination: `07-streaming-pagination.md`
-* Migrations: `08-migrations.md`
+These batches provide end-to-end setup and operation for **warlotdev** with consistent configuration across environments.
