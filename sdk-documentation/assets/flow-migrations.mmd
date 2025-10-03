@@ -1,4 +1,3 @@
-```mermaid
 %%{init: {"theme": "base"}}%%
 flowchart TD
   %% File-based SQL migrations (Warlot SDK Migrator.Up)
@@ -39,5 +38,3 @@ flowchart TD
   C -.-> N2["Only top-level .sql files considered"]:::note
   I -.-> N3["Idempotency header prevents duplicates on retry"]:::note
   E1 -.-> N4["Previously applied steps remain committed"]:::note
-
-```
