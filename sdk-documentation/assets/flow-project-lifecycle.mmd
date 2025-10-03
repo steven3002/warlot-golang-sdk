@@ -1,0 +1,40 @@
+```mermaid
+%%{init: {'theme': 'base'}}%%
+flowchart TD
+  %% Project lifecycle flow (Warlot SDK)
+
+  classDef op fill:#E8F5E9,stroke:#2E7D32,stroke-width:1px,color:#1B5E20
+  classDef io fill:#E3F2FD,stroke:#1565C0,stroke-width:1px,color:#0D47A1
+  classDef dec fill:#FFF3E0,stroke:#F57C00,stroke-width:1px,color:#E65100
+  classDef action fill:#FAFAFA,stroke:#616161,stroke-width:1px,color:#212121
+  classDef note fill:#FFFDE7,stroke:#FBC02D,stroke-dasharray: 3 3,color:#5D4037
+
+  A[Start]:::op --> B[Resolve Project\nPOST /warlotSql/projects/resolve]:::io
+  B --> C{Project exists?}:::dec
+  C -- "Yes" --> D[Use project_id / db_id]:::action
+  C -- "No" --> E[Initialize Project\nPOST /warlotSql/projects/init]:::io --> D
+
+  D --> F[Issue API Key\nPOST /auth/issue]:::io
+  F --> G[Configure Client\nSet BaseURL, x-api-key,\nx-holder-id, x-project-name]:::action
+
+  subgraph Runtime Operations
+    direction TB
+    G --> H[CREATE/ALTER TABLE (DDL)\nPOST /projects/{id}/sql\nBody: { sql, params: [] }]:::io
+    H --> I[INSERT/UPDATE/DELETE (DML)\nPOST /projects/{id}/sql\nHeader: x-idempotency-key]:::io
+    I --> J[SELECT\nPOST /projects/{id}/sql\nReturns: { ok:true, rows:[…] }]:::io
+    J --> K{Large result set?}:::dec
+    K -- "Yes" --> L[Stream rows\nExecSQLStream → RowScanner]:::action
+    K -- "No" --> M[Paginate\nBrowseRows / Pager]:::action
+    H -. optional .-> N[Migrations Up\nApply *.sql; track in _migrations]:::action
+    J --> O[List Tables / Schema / Count / Status]:::action
+  end
+
+  O --> P[Commit Project\nPOST /projects/{id}/commit]:::io
+  P --> Q[End]:::op
+
+  %% Reliability & security annotations
+  F -.-> R[Rate limit handling\n429/5xx → Retry with jitter;\nhonor Retry-After]:::note
+  I -.-> S[Write safety\nIdempotency via x-idempotency-key]:::note
+  J -.-> T[Typed mapping\nQuery[T] for SELECT results]:::note
+  P -.-> U[Chain artifacts\nTxDigest, SignatureHex, CSV/Digest hex]:::note
+```

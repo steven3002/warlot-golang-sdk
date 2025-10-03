@@ -1,0 +1,46 @@
+```mermaid
+%%{init: {'theme': 'base'}}%%
+flowchart TD
+  %% Authentication Issuance & Usage (Warlot)
+
+  classDef op fill:#E8F5E9,stroke:#2E7D32,stroke-width:1px,color:#1B5E20
+  classDef io fill:#E3F2FD,stroke:#1565C0,stroke-width:1px,color:#0D47A1
+  classDef dec fill:#FFF3E0,stroke:#F57C00,stroke-width:1px,color:#E65100
+  classDef action fill:#FAFAFA,stroke:#616161,stroke-width:1px,color:#212121
+  classDef note fill:#FFFDE7,stroke:#FBC02D,stroke-dasharray: 3 3,color:#5D4037
+  classDef err fill:#FFEBEE,stroke:#C62828,stroke-width:1px,color:#B71C1C
+
+  A[Start]:::op --> B[Obtain identifiers\nholder_id, project_name]:::action
+  B --> C[Resolve Project\nPOST /warlotSql/projects/resolve]:::io
+  C --> D{Project found?}:::dec
+  D -- "Yes" --> E[Use project_id / db_id]:::action
+  D -- "No" --> F[Initialize Project\nPOST /warlotSql/projects/init]:::io --> E
+
+  E --> G[Issue API Key\nPOST /auth/issue\nBody:\n{ projectId, projectHolder,\n  projectName, user }]:::io
+  G --> H{Status code}:::dec
+  H -- "200" --> I[Response:\n{ apiKey, url }]:::io
+  H -- "401/403" --> J[Auth/Scope error\nValidate holder/project tuple]:::err --> G
+  H -- "429" --> K[Rate limited\nHonor Retry-After,\nbackoff & retry]:::note --> G
+  H -- "5xx" --> L[Transient error\nExponential backoff & retry]:::note --> G
+  H -- "4xx (other)" --> M[Fix request payload\nand identifiers]:::err --> G
+
+  I --> N[Secure storage of apiKey\n(secret manager / env)]:::action
+  N --> O[Configure SDK Client\nAPIKey, HolderID, ProjectName,\nBaseURL]:::action
+  O --> P[Subsequent database calls\nforward headers:\n x-api-key, x-holder-id,\n x-project-name]:::action
+
+  %% Runtime usage & safety
+  P --> Q{Operation type?}:::dec
+  Q -- "DDL/DML" --> R[Set x-idempotency-key\nfor write safety]:::note --> S[ExecSQL / Commit]:::io
+  Q -- "SELECT" --> T[ExecSQL or ExecSQLStream\nfor large result sets]:::io
+  S --> U[Observe 2xx/4xx/5xx\nSDK retries on 429/5xx]:::note
+  T --> U
+
+  %% Rotation & revocation
+  U --> V{Key rotation needed?}:::dec
+  V -- "Yes" --> W[Issue new key →\nUpdate deployment →\nRevoke/expire old key]:::action --> X[Normal operation]:::op
+  V -- "No" --> X
+
+  %% Observability / hygiene
+  O -.-> Y[Logger redaction:\nAPI key masked in logs]:::note
+  P -.-> Z[Least privilege:\nProject isolation by headers]:::note
+```
